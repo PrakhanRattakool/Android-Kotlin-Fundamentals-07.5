@@ -1,19 +1,3 @@
-/*
- * Copyright 2019, The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package com.example.android.trackmysleepquality.sleeptracker
 
 import android.annotation.SuppressLint
@@ -26,6 +10,10 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.android.trackmysleepquality.R
 import com.example.android.trackmysleepquality.database.SleepNight
 import com.example.android.trackmysleepquality.databinding.ListItemSleepNightBinding
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val ITEM_VIEW_TYPE_HEADER = 0
 private val ITEM_VIEW_TYPE_ITEM = 1
@@ -33,12 +21,18 @@ private val ITEM_VIEW_TYPE_ITEM = 1
 class SleepNightAdapter(val clickListener: SleepNightListener):
         ListAdapter<DataItem, RecyclerView.ViewHolder>(SleepNightDiffCallback()) {
 
+    private val adapterScope = CoroutineScope(Dispatchers.Default)
+
     fun addHeaderAndSubmitList(list: List<SleepNight>?) {
-        val items = when (list) {
-            null -> listOf(DataItem.Header)
-            else -> listOf(DataItem.Header) + list.map { DataItem.SleepNightItem(it) }
+        adapterScope.launch {
+            val items = when (list) {
+                null -> listOf(DataItem.Header)
+                else -> listOf(DataItem.Header) + list.map { DataItem.SleepNightItem(it) }
+            }
+            withContext(Dispatchers.Main) {
+                submitList(items)
+            }
         }
-        submitList(items)
     }
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         when (holder) {
@@ -56,6 +50,7 @@ class SleepNightAdapter(val clickListener: SleepNightListener):
             else -> throw ClassCastException("Unknown viewType ${viewType}")
         }
     }
+
     override fun getItemViewType(position: Int): Int {
         return when (getItem(position)) {
             is DataItem.Header -> ITEM_VIEW_TYPE_HEADER
@@ -91,17 +86,15 @@ class SleepNightAdapter(val clickListener: SleepNightListener):
 }
 
 
-class SleepNightDiffCallback : DiffUtil.ItemCallback<SleepNight>() {
-
-    override fun areItemsTheSame(oldItem: SleepNight, newItem: SleepNight): Boolean {
-        return oldItem.nightId == newItem.nightId
+class SleepNightDiffCallback : DiffUtil.ItemCallback<DataItem>() {
+    override fun areItemsTheSame(oldItem: DataItem, newItem: DataItem): Boolean {
+        return oldItem.id == newItem.id
     }
     @SuppressLint("DiffUtilEquals")
     override fun areContentsTheSame(oldItem: DataItem, newItem: DataItem): Boolean {
         return oldItem == newItem
     }
 }
-
 
 class SleepNightListener(val clickListener: (sleepId: Long) -> Unit) {
     fun onClick(night: SleepNight) = clickListener(night.nightId)
